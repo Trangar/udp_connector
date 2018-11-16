@@ -7,7 +7,7 @@ description = "Allows guaranteed data delivery over UDP sockets"
 repository = "https://github.com/trangar/udp_connector"
 readme = "README.md"
 keywords = ["data", "delivery", "udp", "socket", "networking"]
-
+license = "MIT"
 
 [dependencies]
 failure = "0.1.3"
