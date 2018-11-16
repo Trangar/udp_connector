@@ -144,8 +144,8 @@ impl<TParam: ConnectorParam> Connector<TParam> {
         self.send_ping(socket)
     }
     pub fn state(&self) -> NetworkState {
-        if self.receive.last_ping_time + 2. < time::precise_time_s() {
-            if self.send.last_ping_time + 2. > time::precise_time_s() {
+        if self.receive.last_ping_time + TParam::RECEIVE_PING_TIMEOUT_S < time::precise_time_s() {
+            if self.send.last_ping_time + TParam::SEND_PING_TIMEOUT_S > time::precise_time_s() {
                 NetworkState::Connecting
             } else {
                 NetworkState::Disconnected
@@ -190,11 +190,13 @@ impl<TParam: ConnectorParam> Connector<TParam> {
         if NetworkState::Disconnected == self.state() {
             return Ok(());
         }
-        if self.send.last_ping_time + 1. < time::precise_time_s() {
+        if self.send.last_ping_time + TParam::CONNECTION_TIMEOUT_S < time::precise_time_s() {
             self.send_ping(socket)?;
         }
         for missing_packet in &mut self.receive.missing_message_id_list {
-            if missing_packet.last_request_time + 1. < time::precise_time_s() {
+            if missing_packet.last_request_time + TParam::REQUEST_MISSING_PACKET_INTERVAL_S
+                < time::precise_time_s()
+            {
                 send_packet_to::<TParam::TSend>(
                     self.peer_addr,
                     socket,
@@ -206,7 +208,9 @@ impl<TParam: ConnectorParam> Connector<TParam> {
             }
         }
         for unconfirmed_packet in self.send.unconfirmed_message_cache.values_mut() {
-            if unconfirmed_packet.last_emit_time + 1. < time::precise_time_s() {
+            if unconfirmed_packet.last_emit_time + TParam::EMIT_UNCONFIRMED_PACKET_INTERVAL_S
+                < time::precise_time_s()
+            {
                 unconfirmed_packet.last_emit_time = time::precise_time_s();
                 send_packet_to(self.peer_addr, socket, &unconfirmed_packet.packet)?;
             }
