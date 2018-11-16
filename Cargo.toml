@@ -5,7 +5,7 @@ authors = ["Victor Koenders <victor.koenders@gmail.com>"]
 edition = "2018"
 description = "Allows guaranteed data delivery over UDP sockets"
 repository = "https://github.com/trangar/udp_connector"
-readme = "README"
+readme = "README.md"
 keywords = ["data", "delivery", "udp", "socket", "networking"]
 
 
