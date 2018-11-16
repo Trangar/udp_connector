@@ -6,8 +6,8 @@
 //!
 //! This crate differentiates between two message types:
 //! * Confirmed: This is a message that is:
-//! ** Guaranteed to arrive ***at some point***
-//! ** Not guaranteed to arrive in the correct order
+//! * * Guaranteed to arrive ***at some point***
+//! * * Not guaranteed to arrive in the correct order
 //! * Unconfirmed: This is a message that is not guaranteed to arrive
 //!
 //! Use cases can be:

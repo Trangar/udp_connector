@@ -3,6 +3,11 @@ name = "udp_connector"
 version = "0.1.0"
 authors = ["Victor Koenders <victor.koenders@gmail.com>"]
 edition = "2018"
+description = "Allows guaranteed data delivery over UDP sockets"
+repository = "https://github.com/trangar/udp_connector"
+readme = "README"
+keywords = ["data", "delivery", "udp", "socket", "networking"]
+
 
 [dependencies]
 failure = "0.1.3"
