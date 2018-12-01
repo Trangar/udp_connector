@@ -275,8 +275,6 @@ impl<TParam: ConnectorParam> Connector<TParam> {
         data: &[u8],
     ) -> Result<Option<TParam::TReceive>> {
         let packet: Packet<_> = bincode::deserialize(data)?;
-        println!("Received {:?}", packet);
-        // TODO: This should probably be simplified. Currently it's just a big match statement
         Ok(match packet {
             Packet::Ping {
                 last_send_message_id,
@@ -421,12 +419,6 @@ fn send_packet_to<TSend: serde::Serialize>(
     packet: &Packet<TSend>,
 ) -> Result<()> {
     let bytes = bincode::serialize(packet)?;
-    println!(
-        "Sending {:?} from {:?} to {:?}",
-        bytes,
-        socket.local_addr(),
-        peer_addr
-    );
     socket.send_to(&bytes, peer_addr)?;
     Ok(())
 }

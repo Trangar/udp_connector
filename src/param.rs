@@ -1,5 +1,4 @@
 use serde::{Deserialize, Serialize};
-use std::fmt::Debug;
 
 /// Settings that are set up for a Connector. This can be used to tweak your Connector at compile-time
 pub trait ConnectorParam {
@@ -12,7 +11,7 @@ pub trait ConnectorParam {
     /// # use udp_connector::ConnectorParam;
     ///
     /// // For the server:
-    /// #[derive(Debug, Serialize, Deserialize, Eq, PartialEq)]
+    /// #[derive(Serialize, Deserialize, Debug, Eq, PartialEq)]
     /// pub enum ServerToClient {
     ///     LoginResult { success: bool },
     /// }
@@ -27,7 +26,7 @@ pub trait ConnectorParam {
     /// }
     /// # fn main() {}
     /// ```
-    type TSend: for<'a> Deserialize<'a> + Serialize + Debug + Eq + PartialEq;
+    type TSend: for<'a> Deserialize<'a> + Serialize;
 
     /// The type that this connector will be sending. This is usually an enum.
     ///
@@ -40,7 +39,7 @@ pub trait ConnectorParam {
     /// # type AuthenticateParams = u32;
     ///
     /// // For the server:
-    /// #[derive(Debug, Serialize, Deserialize, Eq, PartialEq)]
+    /// #[derive(Serialize, Deserialize, Debug, Eq, PartialEq)]
     /// pub enum ClientToServer {
     ///     Login { params: AuthenticateParams },
     /// }
@@ -54,7 +53,7 @@ pub trait ConnectorParam {
     /// }
     /// # fn main() {}
     /// ```
-    type TReceive: for<'a> Deserialize<'a> + Serialize + Debug + Eq + PartialEq;
+    type TReceive: for<'a> Deserialize<'a> + Serialize;
 
     /// The interval at which pings are being emitted to the other connector. This should be set in relation to `RECEIVE_PING_TIMEOUT_S` and `SEND_PING_TIMEOUT_S`, and how often you expect to lose packets.
     const PING_INTERVAL_S: f64 = 0.5;
