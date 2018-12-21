@@ -28,7 +28,7 @@ pub trait ConnectorParam {
     /// ```
     type TSend: for<'a> Deserialize<'a> + Serialize;
 
-    /// The type that this connector will be sending. This is usually an enum.
+    /// The type that this connector will be receiving. This is usually an enum.
     ///
     /// ```rust
     /// # #[macro_use]

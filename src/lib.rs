@@ -265,6 +265,15 @@ impl<TParam: ConnectorParam> Connector<TParam> {
         Ok(())
     }
 
+    /// Resolve an incoming ping or ping.
+    /// This will request all the messages up to this message, as well as set the last received time.
+    fn resolve_incoming_ping(&mut self, id: Option<NonZeroU64>) {
+        if let Some(last_send_message_id) = id {
+            self.request_message_up_to(last_send_message_id.get());
+        }
+        self.receive.last_ping_time = time::precise_time_s();
+    }
+
     /// Handles incoming data. This will perform internal logic to make sure data is being transmitted correctly,
     /// and requests missing packets.
     ///
@@ -279,10 +288,7 @@ impl<TParam: ConnectorParam> Connector<TParam> {
             Packet::Ping {
                 last_send_message_id,
             } => {
-                if let Some(last_send_message_id) = last_send_message_id {
-                    self.request_message_up_to(last_send_message_id.get());
-                }
-                self.receive.last_ping_time = time::precise_time_s();
+                self.resolve_incoming_ping(last_send_message_id);
                 send_packet_to::<TParam::TSend>(
                     self.peer_addr,
                     socket,
@@ -316,10 +322,7 @@ impl<TParam: ConnectorParam> Connector<TParam> {
             Packet::Pong {
                 last_send_message_id,
             } => {
-                if let Some(last_send_message_id) = last_send_message_id {
-                    self.request_message_up_to(last_send_message_id.get());
-                }
-                self.receive.last_ping_time = time::precise_time_s();
+                self.resolve_incoming_ping(last_send_message_id);
                 None
             }
             Packet::Data { message_id, data } => {
