@@ -377,12 +377,16 @@ impl<TParam: ConnectorParam> Connector<TParam> {
     /// Send an unconfirmed message to the other connector. It is not guaranteed that this message will ever arrive.
     ///
     /// This is useful for data that does not have to arrive. Think of things like player movements, frames of a lossy video stream, etc.
-    pub fn send_unconfirmed(&mut self, socket: &mut Socket, msg: TParam::TSend) -> Result<()> {
+    pub fn send_unconfirmed<T: Into<TParam::TSend>>(
+        &mut self,
+        socket: &mut Socket,
+        msg: T,
+    ) -> Result<()> {
         send_packet_to(
             self.peer_addr,
             socket,
             &Packet::Data {
-                data: msg,
+                data: msg.into(),
                 message_id: None,
             },
         )?;
@@ -390,14 +394,18 @@ impl<TParam: ConnectorParam> Connector<TParam> {
     }
 
     /// Send a confirmed message to the other connector. The connector will try to make sure this message arrives. It is not guaranteed that messages will arrive in the same order at the other side.
-    pub fn send_confirmed(&mut self, socket: &mut Socket, msg: TParam::TSend) -> Result<()> {
+    pub fn send_confirmed<T: Into<TParam::TSend>>(
+        &mut self,
+        socket: &mut Socket,
+        msg: T,
+    ) -> Result<()> {
         let sending_id = if let Some(id) = self.send.next_message_id {
             id
         } else {
             unsafe { NonZeroU64::new_unchecked(1) }
         };
         let data = Packet::Data {
-            data: msg,
+            data: msg.into(),
             message_id: Some(sending_id),
         };
         send_packet_to(self.peer_addr, socket, &data)?;
