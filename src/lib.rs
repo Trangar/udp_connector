@@ -29,7 +29,7 @@ pub type Result<T> = std::result::Result<T, failure::Error>;
 use self::packet::Packet;
 pub use self::param::ConnectorParam;
 
-use std::collections::HashMap;
+use hashbrown::HashMap;
 use std::io::ErrorKind;
 use std::net::{SocketAddr, UdpSocket};
 use std::num::NonZeroU64;
