@@ -15,5 +15,5 @@ bincode = "1.0.1"
 serde = "1.0.83"
 serde_derive = "1.0.83"
 time = "0.2.16"
-hashbrown = "0.1.7"
+hashbrown = "0.7.2"
 
