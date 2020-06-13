@@ -30,7 +30,7 @@ fn test_timeout() {
         .connector
         .connect(&mut proxy.client.socket)
         .expect("Could not reconnect");
-    assert_eq!(NetworkState::Connecting, proxy.client.connector.state());
+    assert_eq!(NetworkState::Connected, proxy.client.connector.state());
     let message = proxy.handle_one_message_from_client();
     assert_eq!(
         Packet::Ping {
@@ -55,7 +55,7 @@ fn test_timeout() {
     );
 
     // Client needs to receive this message
-    assert_eq!(NetworkState::Connecting, proxy.client.connector.state());
+    assert_eq!(NetworkState::Connected, proxy.client.connector.state());
     proxy
         .client
         .connector

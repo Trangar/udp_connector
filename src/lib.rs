@@ -32,7 +32,7 @@ pub use self::param::ConnectorParam;
 use hashbrown::HashMap;
 use std::io::ErrorKind;
 use std::net::{SocketAddr, UdpSocket};
-use std::num::NonZeroU64;
+use std::{num::NonZeroU64, time::Instant};
 
 /// Contains data about the sending half of this connector
 #[derive(Debug)]
@@ -44,7 +44,7 @@ struct ConnectorSend<TParam: ConnectorParam> {
     next_message_id: Option<NonZeroU64>,
 
     /// Last time a ping was send
-    last_ping_time: f64,
+    last_ping: Instant,
 }
 
 impl<TParam: ConnectorParam> Default for ConnectorSend<TParam> {
@@ -52,7 +52,7 @@ impl<TParam: ConnectorParam> Default for ConnectorSend<TParam> {
         ConnectorSend {
             unconfirmed_message_cache: HashMap::new(),
             next_message_id: None,
-            last_ping_time: 0.,
+            last_ping: Instant::now(),
         }
     }
 }
@@ -67,7 +67,7 @@ struct ConnectorReceive {
     missing_message_id_list: Vec<MissingId>,
 
     /// Last time a ping was received
-    last_ping_time: f64,
+    last_ping: Instant,
 }
 
 impl Default for ConnectorReceive {
@@ -75,7 +75,7 @@ impl Default for ConnectorReceive {
         ConnectorReceive {
             last_message_id: None,
             missing_message_id_list: Vec::new(),
-            last_ping_time: 0.,
+            last_ping: Instant::now(),
         }
     }
 }
@@ -103,13 +103,13 @@ pub struct Connector<TParam: ConnectorParam> {
 #[derive(Debug)]
 struct MissingId {
     pub id: NonZeroU64,
-    pub last_request_time: f64,
+    pub last_request: Instant,
 }
 
 #[derive(Debug)]
 struct CachedPacket<TSend> {
     pub packet: Packet<TSend>,
-    pub last_emit_time: f64,
+    pub last_emit: Instant,
 }
 
 /// The state of the connector. This is based on when the last ping was send or received. Changing your ConnectorParam will greatly affect the results of `Connector.state()`, returning this value.
@@ -129,7 +129,7 @@ impl MissingId {
     pub fn new(id: NonZeroU64) -> MissingId {
         MissingId {
             id,
-            last_request_time: 0.,
+            last_request: Instant::now(),
         }
     }
 }
@@ -175,7 +175,7 @@ impl<TParam: ConnectorParam> Connector<TParam> {
     }
 
     /// Connect to the `bound_addr`. This will reset the internal state of the connector, and start up the connection handshake
-    pub fn connect(&mut self, socket: &mut Socket) -> Result<()> {
+    pub fn connect(&mut self, socket: &mut dyn Socket) -> Result<()> {
         self.send = Default::default();
         self.receive = Default::default();
         self.send_ping(socket)
@@ -186,8 +186,8 @@ impl<TParam: ConnectorParam> Connector<TParam> {
     /// * If we have send a ping since `ConnectorParam::SEND_PING_TIMEOUT_S` ago, we're connecting
     /// * Else we're disconnected
     pub fn state(&self) -> NetworkState {
-        if self.receive.last_ping_time + TParam::RECEIVE_PING_TIMEOUT_S < time::precise_time_s() {
-            if self.send.last_ping_time + TParam::SEND_PING_TIMEOUT_S > time::precise_time_s() {
+        if self.receive.last_ping.elapsed().as_secs_f64() > TParam::RECEIVE_PING_TIMEOUT_S {
+            if self.send.last_ping.elapsed().as_secs_f64() > TParam::SEND_PING_TIMEOUT_S {
                 NetworkState::Connecting
             } else {
                 NetworkState::Disconnected
@@ -200,7 +200,7 @@ impl<TParam: ConnectorParam> Connector<TParam> {
     /// Receive data from the other connector. This will call `handle_incoming_data` internally.
     ///
     /// Ideally you would never need this function. Use `update_and_receive` on clients, and `handle_incoming_data` on servers.
-    pub fn receive_from(&mut self, socket: &mut Socket) -> Result<Vec<TParam::TReceive>> {
+    pub fn receive_from(&mut self, socket: &mut dyn Socket) -> Result<Vec<TParam::TReceive>> {
         let mut buffer = [0u8; 1024];
         let mut result = Vec::new();
         let mut had_message = false;
@@ -227,22 +227,22 @@ impl<TParam: ConnectorParam> Connector<TParam> {
     }
 
     /// Update this connector and receive data from the remote connector.
-    pub fn update_and_receive(&mut self, socket: &mut Socket) -> Result<Vec<TParam::TReceive>> {
+    pub fn update_and_receive(&mut self, socket: &mut dyn Socket) -> Result<Vec<TParam::TReceive>> {
         self.update(socket)?;
         self.receive_from(socket)
     }
 
     /// Update this connector. This will make sure the connection is still intact and requests any potentially missing packets.
-    pub fn update(&mut self, socket: &mut Socket) -> Result<()> {
+    pub fn update(&mut self, socket: &mut dyn Socket) -> Result<()> {
         if NetworkState::Disconnected == self.state() {
             return Ok(());
         }
-        if self.send.last_ping_time + TParam::PING_INTERVAL_S < time::precise_time_s() {
+        if self.send.last_ping.elapsed().as_secs_f64() > TParam::PING_INTERVAL_S {
             self.send_ping(socket)?;
         }
         for missing_packet in &mut self.receive.missing_message_id_list {
-            if missing_packet.last_request_time + TParam::REQUEST_MISSING_PACKET_INTERVAL_S
-                < time::precise_time_s()
+            if missing_packet.last_request.elapsed().as_secs_f64()
+                > TParam::REQUEST_MISSING_PACKET_INTERVAL_S
             {
                 send_packet_to::<TParam::TSend>(
                     self.peer_addr,
@@ -251,14 +251,14 @@ impl<TParam: ConnectorParam> Connector<TParam> {
                         id: missing_packet.id,
                     },
                 )?;
-                missing_packet.last_request_time = time::precise_time_s();
+                missing_packet.last_request = Instant::now();
             }
         }
         for unconfirmed_packet in self.send.unconfirmed_message_cache.values_mut() {
-            if unconfirmed_packet.last_emit_time + TParam::EMIT_UNCONFIRMED_PACKET_INTERVAL_S
-                < time::precise_time_s()
+            if unconfirmed_packet.last_emit.elapsed().as_secs_f64()
+                > TParam::EMIT_UNCONFIRMED_PACKET_INTERVAL_S
             {
-                unconfirmed_packet.last_emit_time = time::precise_time_s();
+                unconfirmed_packet.last_emit = Instant::now();
                 send_packet_to(self.peer_addr, socket, &unconfirmed_packet.packet)?;
             }
         }
@@ -271,7 +271,7 @@ impl<TParam: ConnectorParam> Connector<TParam> {
         if let Some(last_send_message_id) = id {
             self.request_message_up_to(last_send_message_id.get());
         }
-        self.receive.last_ping_time = time::precise_time_s();
+        self.receive.last_ping = Instant::now();
     }
 
     /// Handles incoming data. This will perform internal logic to make sure data is being transmitted correctly,
@@ -280,7 +280,7 @@ impl<TParam: ConnectorParam> Connector<TParam> {
     /// Any actual data that was received, will be returned from this function.
     pub fn handle_incoming_data(
         &mut self,
-        socket: &mut Socket,
+        socket: &mut dyn Socket,
         data: &[u8],
     ) -> Result<Option<TParam::TReceive>> {
         let packet: Packet<_> = bincode::deserialize(data)?;
@@ -300,7 +300,7 @@ impl<TParam: ConnectorParam> Connector<TParam> {
             }
             Packet::RequestPacket { id } => {
                 if let Some(packet) = self.send.unconfirmed_message_cache.get_mut(&id) {
-                    packet.last_emit_time = time::precise_time_s();
+                    packet.last_emit = Instant::now();
                     send_packet_to(self.peer_addr, socket, &packet.packet)?;
                 } else {
                     send_packet_to::<TParam::TSend>(
@@ -340,8 +340,8 @@ impl<TParam: ConnectorParam> Connector<TParam> {
         })
     }
 
-    fn send_ping(&mut self, socket: &mut Socket) -> Result<()> {
-        self.send.last_ping_time = time::precise_time_s();
+    fn send_ping(&mut self, socket: &mut dyn Socket) -> Result<()> {
+        self.send.last_ping = Instant::now();
         send_packet_to::<TParam::TSend>(
             self.peer_addr,
             socket,
@@ -382,7 +382,7 @@ impl<TParam: ConnectorParam> Connector<TParam> {
     /// This is useful for data that does not have to arrive. Think of things like player movements, frames of a lossy video stream, etc.
     pub fn send_unconfirmed<T: Into<TParam::TSend>>(
         &mut self,
-        socket: &mut Socket,
+        socket: &mut dyn Socket,
         msg: T,
     ) -> Result<()> {
         send_packet_to(
@@ -399,7 +399,7 @@ impl<TParam: ConnectorParam> Connector<TParam> {
     /// Send a confirmed message to the other connector. The connector will try to make sure this message arrives. It is not guaranteed that messages will arrive in the same order at the other side.
     pub fn send_confirmed<T: Into<TParam::TSend>>(
         &mut self,
-        socket: &mut Socket,
+        socket: &mut dyn Socket,
         msg: T,
     ) -> Result<()> {
         let sending_id = if let Some(id) = self.send.next_message_id {
@@ -416,7 +416,7 @@ impl<TParam: ConnectorParam> Connector<TParam> {
             sending_id,
             CachedPacket {
                 packet: data,
-                last_emit_time: time::precise_time_s(),
+                last_emit: Instant::now(),
             },
         );
         self.send.next_message_id = NonZeroU64::new(sending_id.get() + 1);
@@ -426,7 +426,7 @@ impl<TParam: ConnectorParam> Connector<TParam> {
 
 fn send_packet_to<TSend: serde::Serialize>(
     peer_addr: SocketAddr,
-    socket: &mut Socket,
+    socket: &mut dyn Socket,
     packet: &Packet<TSend>,
 ) -> Result<()> {
     let bytes = bincode::serialize(packet)?;
