@@ -112,7 +112,7 @@ impl Default for Proxy {
             .connect(&mut proxy.client.socket)
             .expect("Could not connect to server");
 
-        assert_eq!(NetworkState::Connecting, proxy.client.connector.state());
+        assert_eq!(NetworkState::Connected, proxy.client.connector.state());
 
         let message = proxy.handle_one_message_from_client();
         assert_eq!(
