@@ -14,5 +14,5 @@ failure = "0.1.8"
 bincode = "1.2.1"
 serde = "1.0.111"
 serde_derive = "1.0.111"
-hashbrown = "0.10.0"
+hashbrown = "0.11.0"
 
